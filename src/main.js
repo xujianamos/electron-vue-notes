@@ -4,6 +4,7 @@ import router from './router'
 import store from './store'
 import './plugins/element-ui'
 import './plugins/fortawesome'
+import './plugins/mavonEditor'
 
 Vue.config.productionTip = false
 
