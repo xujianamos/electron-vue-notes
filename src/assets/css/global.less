@@ -1,0 +1,15 @@
+.scrollbar-filelist {
+  height: calc(100vh - 56px);
+  overflow-x: hidden !important;
+}
+.el-scrollbar__bar {
+  opacity: 1;
+
+  &.is-vertical {
+    right: 0px;
+    width: 5px;
+    .el-scrollbar__thumb {
+      background-color: rgba(144, 147, 153, 0.5);
+    }
+  }
+}

@@ -26,6 +26,7 @@ module.exports = {
     'no-restricted-syntax': 0,
     'no-plusplus': 0, // 禁用 ++
     'consistent-return': 0, // 关闭箭头函数必须要return
+    'no-useless-return': 0,
     'no-return-assign': 0, // return 语句中不能有赋值表达式
     'global-require': 0, // 关闭禁止使用requrie
     'prefer-promise-reject-errors': 0, // 这条规则旨在确保承诺只被Error对象拒绝。

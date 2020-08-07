@@ -4,7 +4,7 @@
  -->
 <template>
   <div class="content-edit">
-    <el-input class="file-title" v-model="currentTitle" placeholder="请输入标题" />
+    <el-input class="file-title" v-model="currentTitle" placeholder="请输入标题" @blur="handleTitleBlur" />
     <mavon-editor v-bind="$attrs" v-on="$listeners" class="markdown-wrapper" />
   </div>
 </template>
@@ -20,9 +20,17 @@ export default {
       currentTitle: this.title
     }
   },
+  methods: {
+    handleTitleBlur(event) {
+      this.$emit('titleBlur', event.target.value)
+    }
+  },
   watch: {
     currentTitle(newValue) {
       this.$emit('update:title', newValue)
+    },
+    title(newValue) {
+      this.currentTitle = newValue
     }
   }
 }

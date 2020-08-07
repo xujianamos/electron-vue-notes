@@ -1,22 +1,33 @@
 <template>
   <div class="app-wrapper">
     <div class="sidebar-container">
-      <file-search v-model="searchTitle" />
-      <!-- 测试代码 -->
-      <el-button type="primary" @click="createTest">测-增</el-button>
-      <el-button type="danger" @click="deleteTest">测-删</el-button>
-      <el-button type="warning" @click="updateTest">测-改</el-button>
-      <el-button type="success" @click="queryTest">测-查</el-button>
-      <file-list :fileList="fileList" />
+      <file-search
+        v-model.trim="searchTitle"
+        @clear="getFileList"
+        @change="handleChange"
+        @create="fileCreate"
+        @search="handleSearch"
+        @keyup.enter.native="handleSearch"
+        clearable
+      />
+      <file-list :fileList="fileList" :active.sync="activeIndex" :selectedFile.sync="selectedFile">
+        <template v-slot:menu>
+          <li @click="handleFileTop()">{{ selectedFile.isTop ? '取消置顶' : '置顶' }}</li>
+          <li @click="fileDelete()">删除</li>
+        </template>
+      </file-list>
     </div>
     <div class="main-container">
+      <div class="placeholder" v-if="fileList.length === 0">暂无笔记</div>
       <file-edit
+        v-else
         v-model="fileItem.content"
         :title.sync="fileItem.title"
         :boxShadow="false"
         :subfield="false"
         :shortCut="false"
-        @change="onSubmit"
+        @titleBlur="updateTitle"
+        @change="updateContent"
       />
     </div>
   </div>
@@ -26,33 +37,29 @@
 import FileSearch from '@/components/FileSearch'
 import FileList from '@/components/FileList'
 import FileEdit from '@/components/FileEdit'
+import dayjs from 'dayjs'
 
 export default {
   name: 'Home',
   data() {
     return {
       searchTitle: '',
-      fileList: [
-        { id: 1, title: '文件名 1', time: '2020-07-21' },
-        { id: 2, title: '文件名 2', time: '2020-07-22' },
-        { id: 3, title: '文件名 3', time: '2020-07-23' },
-        { id: 4, title: '文件名 4', time: '2020-07-24' },
-        { id: 5, title: '文件名 5', time: '2020-07-25' },
-        { id: 6, title: '文件名 6', time: '2020-07-26' },
-        { id: 7, title: '文件名 7', time: '2020-07-27' },
-        { id: 8, title: '文件名 8', time: '2020-07-28' },
-        { id: 9, title: '文件名 9', time: '2020-07-29' },
-        { id: 10, title: '文件名 10', time: '2020-07-30' },
-        { id: 11, title: '文件名 11', time: '2020-07-31' },
-        { id: 12, title: '文件名 12', time: '2020-07-32' }
-      ],
+      fileList: [],
       fileItem: {
-        title: '手摸手Electron + Vue实战教程（三）',
+        _id: '',
+        title: '',
         content: ''
-      }
+      },
+      activeIndex: 0,
+      // 定时器id
+      timerId: 0,
+      // 右键菜单选中的文件数据
+      selectedFile: {}
     }
   },
-
+  mounted() {
+    this.init()
+  },
   components: {
     FileSearch,
     FileList,
@@ -62,35 +69,120 @@ export default {
   computed: {},
 
   methods: {
-    // 增
-    createTest() {
-      const fileNew = { title: '无标题笔记', content: '' }
-      this.$db.insert(fileNew)
+    // 初始化
+    async init() {
+      await this.getFileList()
+      if (this.fileList.length === 0) return
+      const [firstFileItem] = this.fileList
+      this.fileItem = firstFileItem
+      this.activeIndex = 0
     },
-    // 删
-    async deleteTest() {
-      const list = await this.$db.find().sort({ updatedAt: -1 })
-      if (list.length === 0) return
-      this.$db.remove({ _id: list[0]._id }).then(() => {
-        this.$message.warning('删除成功')
+    // 获取笔记列表
+    async getFileList(query = {}) {
+      const list = await this.$db.markdown.find(query).sort({ isTop: -1, updatedAt: -1 })
+      // 格式化时间，添加内容备份字段
+      // for (const item of list) {
+      //   item.createdAt = dayjs(item.createdAt).format('YY-MM-DD HH:mm:ss')
+      //   item.updatedAt = dayjs(item.updatedAt).format('YY-MM-DD HH:mm:ss')
+      // }
+      this.fileList = list.map(item => {
+        item.originalContent = item.content
+        item.createdAt = dayjs(item.createdAt).format('YYYY-MM-DD HH:mm:ss')
+        item.updatedAt = dayjs(item.updatedAt).format('YYYY-MM-DD HH:mm:ss')
+        return item
       })
     },
-    // 改
-    async updateTest() {
-      const list = await this.$db.find().sort({ updatedAt: -1 })
-      if (list.length === 0) return
-      this.$db.update({ _id: list[0]._id }, { $set: { title: '修改过的标题' } }).then(() => {
-        this.$message.success('修改成功')
+    // 新增笔记
+    fileCreate() {
+      console.log('123')
+      // markdown文件只需要存储标题和内容就够了
+      // isTop表示是否置顶
+      const defaultFile = { title: '无标题笔记', content: '', isTop: false }
+      console.log(this.$db.markdown)
+      this.$db.markdown.insert(defaultFile).then(async () => {
+        await this.getFileList()
+        const [firstFileItem] = this.fileList
+        this.fileItem = firstFileItem
+        this.activeIndex = 0
+        this.$message.success('新增笔记成功')
       })
     },
-    // 查
-    async queryTest() {
-      const list = await this.$db.find().sort({ updatedAt: -1 })
-      console.log(list)
+    // 搜索笔记
+    handleSearch() {
+      if (!this.searchTitle) return
+      // 动态生成正则表达式
+      const reg = new RegExp(`${this.searchTitle}`, 'i')
+      const query = { title: reg }
+      this.getFileList(query)
     },
-    onSubmit(value) {
-      console.log(value)
-      console.log(this.fileItem)
+    // 监听输入框的变化
+    handleChange(val) {
+      if (!val) {
+        // 输入框为空就重新获取列表
+        this.getFileList()
+      }
+    },
+    // 实时监听标题内容并存储
+    updateTitle(title) {
+      const { id } = this.fileItem
+      console.log(id)
+      this.$db.markdown.update({ _id, title: { $ne: title } }, { $set: { title } }).then(() => {
+        this.refreshList()
+      })
+    },
+    // 实时监听编辑内容并保存
+    updateContent(content) {
+      const { _id, originalContent } = this.fileItem
+      console.log(_id)
+      if (originalContent === content) return
+      if (this.timerId) clearTimeout(this.timerId)
+      this.timerId = setTimeout(() => {
+        this.$db.markdown.update({ _id, content: { $ne: content } }, { $set: { content } }).then(() => {
+          this.refreshList()
+        })
+      }, 1000)
+    },
+    // 刷新列表，并高亮第一个笔记
+    async refreshList() {
+      if (this.activeIndex === 0) return
+      await this.getFileList()
+      const [firstFileItem] = this.fileList
+      this.fileItem = firstFileItem
+      this.activeIndex = 0
+      this.$message.success('保存成功')
+    },
+    // 右键删除操作
+    fileDelete() {
+      this.$confirm('此操作将永久删除该笔记, 是否继续?', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      })
+        .then(() => {
+          const { _id } = this.selectedFile
+          this.$db.markdown
+            .remove({ _id })
+            .then(num => {
+              this.$message.success(`删除了${num}个项目`)
+              this.init()
+            })
+            .catch(() => {
+              this.$message.error('删除失败')
+            })
+        })
+        .catch(() => {})
+    },
+    // 右键置顶操作
+    handleFileTop() {
+      const { _id, isTop } = this.selectedFile
+      this.$db.markdown.update({ _id }, { $set: { isTop: !isTop } }).then(() => {
+        this.init()
+      })
+    }
+  },
+  watch: {
+    activeIndex(newValue) {
+      this.fileItem = this.fileList[newValue]
     }
   }
 }

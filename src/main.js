@@ -6,6 +6,7 @@ import './plugins/element-ui'
 import './plugins/fortawesome'
 import './plugins/mavonEditor'
 import './plugins/datastore'
+import './assets/css/global.css'
 
 Vue.config.productionTip = false
 
