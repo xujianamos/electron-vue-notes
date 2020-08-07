@@ -3,5 +3,9 @@ module.exports = {
     electronBuilder: {
       nodeIntegration: true
     }
+  },
+  devServer: {
+    host: 'localhost',
+    port: 8080
   }
 }
